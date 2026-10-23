@@ -15,7 +15,7 @@ A single CPU model serving three decisions behind `POST /v1/decide`. Each reques
 - **grounded head:** calibrated logistic regression on three views of the draft–KB difference after quantity normalisation: words only in the draft, words only in the KB article, and hashed cross-pairs of the two. The cross-pairs let the model learn which substitutions are harmless (synonyms) and which are contradictions (audience, method or quantity swaps). Quantity-mismatch counts are included as well.
 - **Abstention:** per-head confidence cuts are set from out-of-fold predictions so that about 84.5% of requests are answered.
 
-No pretrained weights are used. Artifacts total about 5 MB.
+No pretrained weights are used. Artifacts total about 3 MB.
 
 ## Training data
 `data/train.jsonl` (6,500 records). `data/dev.jsonl` (1,500) is used only for evaluation.
