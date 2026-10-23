@@ -12,7 +12,7 @@ from typing import Dict, List, Set, Tuple
 import numpy as np
 
 QUEUES: List[str] = ["billing", "technical", "account", "shipping", "general"]
-TIER_CAPS = {"free": 31.10, "pro": 121.29, "enterprise": 499.45}
+TIER_CAPS = {"free": 31.25, "pro": 125.00, "enterprise": 500.00}
 TIERS = ["free", "pro", "enterprise"]
 
 WORD_NUMS = {
@@ -35,6 +35,11 @@ DUR_RE = re.compile(r"\b" + _NUM + r"(?:\s+an?)?\s+" + _UNIT + r"\b")
 BARE_DUR_RE = re.compile(r"\b(?:a|an|the)\s+(fortnight|week|month|year|day|hour)\b")
 INT_RE = re.compile(r"\b\d+(?:\.\d+)?\b")
 TOKEN_RE = re.compile(r"[a-z0-9]+")
+SECURITY_RE = re.compile(
+    r"\b(2fa|authenticator|recovery codes?|delete (my )?account|permanently delete|gdpr)\b", re.I)
+SECURITY_P = 0.02  # empirical approval rate of these $0 tickets in train (6/338)
+CONDITIONS = {"only", "except", "excluding", "annual", "monthly", "domestic",
+              "international", "business"}
 STOP = set("""a an the and or of to in on for with is are be by at it this that
 your you we our i as from will can may any all up so there has have was its
 which these into after before about until within per""".split())
@@ -81,7 +86,9 @@ def grounded_dense(draft: str, kb: str) -> np.ndarray:
     extra_dur = len(dd - kd)
     extra_num = len(dn - kn)
     novel = dt - kt
+    cond = (dt & CONDITIONS) - (kt & CONDITIONS)
     return np.array([
+        float(len(cond) > 0),
         float(extra_dur > 0), extra_dur, len(dd), float(extra_num > 0), extra_num,
         len(novel) / (len(dt) + 1.0), len(dt & kt) / (len(dt) + 1.0),
         len(draft) / (len(kb) + 1.0),
@@ -106,3 +113,8 @@ def approve_dense(state: Dict) -> np.ndarray:
 def over_cap(state: Dict) -> bool:
     tier = state.get("customer_tier") or "free"
     return float(state.get("amount") or 0.0) > TIER_CAPS.get(tier, TIER_CAPS["free"])
+
+
+def security_risk(state: Dict) -> bool:
+    """$0 requests for 2FA / authenticator / account deletion need a human identity check."""
+    return bool(SECURITY_RE.search(ticket_text(state))) and float(state.get("amount") or 0.0) == 0.0

@@ -6,7 +6,7 @@ Train the Decide model and write artifacts/decide.joblib.
 One shared TF-IDF backbone (word + char n-grams over every text field), three
 logistic-regression heads with sigmoid (Platt) calibration fitted by
 cross-validation, and per-head abstention thresholds chosen from out-of-fold
-confidences so that about 83% of requests are answered.
+confidences so that about 84.5% of requests are answered.
 """
 
 import json
@@ -27,7 +27,7 @@ from sklearn.pipeline import FeatureUnion
 
 import features as F
 
-COVERAGE = 0.83
+COVERAGE = 0.845
 APPROVE_TAU = 0.75  # 3:1 cost asymmetry -> approve only when p >= 3/4
 
 
@@ -102,13 +102,16 @@ def main():
     # route
     yr = np.array([F.QUEUES.index(r["labels"]["route"]) for r in tr])
     Xr = route_X(vec, S)
-    route = calibrated(4.0)
+    # Plain multinomial LR is already well calibrated here; Platt one-vs-rest
+    # made it worse (dev ECE 0.082 -> 0.044 without it).
+    route = LogisticRegression(C=10.0, max_iter=3000)
     oof = cross_val_predict(route, Xr, yr, cv=5, method="predict_proba")
     route.fit(Xr, yr)
     route_cut = abstain_cut(oof.max(1))
 
     # approve: train only on under-cap tickets; over-cap is a hard hold.
     under = np.array([not F.over_cap(s) for s in S])
+    secure = np.array([F.security_risk(s) for s in S])
     ya = np.array([int(r["labels"]["approve"]) for r in tr])
     Xa = approve_X(vec, S)
     approve = calibrated(2.0)
@@ -116,6 +119,13 @@ def main():
     approve.fit(Xa[under], ya[under])
     pa_all = np.zeros(len(S))
     pa_all[under] = oof_a
+    pa_all[secure & under] = F.SECURITY_P
+    # Pick tau on out-of-fold cost; 0.75 is the theoretical optimum for 3:1.
+    taus = np.round(np.arange(0.55, 0.801, 0.01), 2)
+    costs = [np.mean(np.where((pa_all >= t) & (ya == 0), 3.0,
+                              np.where((pa_all < t) & (ya == 1), 1.0, 0.0))) for t in taus]
+    tau = float(taus[int(np.argmin(costs))])
+    print("tau sweep (oof cost):", dict(zip(taus.tolist(), np.round(costs, 4).tolist())), "->", tau)
     approve_cut = abstain_cut(np.maximum(pa_all, 1 - pa_all))
 
     # grounded
@@ -130,7 +140,7 @@ def main():
     joblib.dump({
         "vec": vec, "route": route, "approve": approve, "grounded": grounded,
         "cuts": {"route": route_cut, "approve": approve_cut, "grounded": grounded_cut},
-        "approve_tau": APPROVE_TAU,
+        "approve_tau": tau,
     }, "artifacts/decide.joblib", compress=3)
 
     # ---- dev report ----
@@ -139,9 +149,10 @@ def main():
     print("route    acc %.4f  macroF1 %.4f" % (accuracy_score(yrd, pr.argmax(1)),
                                                f1_score(yrd, pr.argmax(1), average="macro")))
     pa = approve.predict_proba(approve_X(vec, D))[:, 1]
+    pa[[F.security_risk(s) for s in D]] = F.SECURITY_P
     pa[[F.over_cap(s) for s in D]] = 0.0
     yad = np.array([int(r["labels"]["approve"]) for r in dv])
-    pred = pa >= APPROVE_TAU
+    pred = pa >= tau
     cost = np.mean(np.where(pred & (yad == 0), 3.0, np.where(~pred & (yad == 1), 1.0, 0.0)))
     print("approve  cost %.4f (always-hold %.4f)  ece %.4f" % (cost, yad.mean(), ece(pa, yad)))
     pg = grounded.predict_proba(grounded_X(vec, D))[:, 1]

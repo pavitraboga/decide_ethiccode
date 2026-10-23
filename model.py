@@ -36,6 +36,8 @@ class DecisionModel:
         # Policy rule: nothing above the tier cap is ever approved in the data.
         if F.over_cap(state):
             return False, 0.0, False
+        if F.security_risk(state):
+            return False, F.SECURITY_P, False
         p = float(self.approve_head.predict_proba(approve_X(self.vec, [state]))[0, 1])
         return p >= self.tau, p, max(p, 1 - p) < self.cuts["approve"]
 
