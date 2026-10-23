@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Tuple
 import joblib
 
 import features as F
-from train import approve_X, grounded_X, route_X
+from train import approve_X, grounded_X, route_X, smooth
 
 QUEUES: List[str] = F.QUEUES
 
@@ -24,9 +24,12 @@ class DecisionModel:
         self.grounded_head = b["grounded"]
         self.cuts = b["cuts"]
         self.tau = b["approve_tau"]
+        self.route_T = b["route_T"]
+        self.route_eps = b["route_eps"]
 
     def route(self, state: Dict[str, Any]) -> Tuple[str, Dict[str, float], float, bool]:
-        p = self.route_head.predict_proba(route_X(self.vec, [state]))[0]
+        p = smooth(self.route_head.predict_proba(route_X(self.vec, [state])),
+                   self.route_T, self.route_eps)[0]
         probs = {q: float(p[i]) for i, q in enumerate(QUEUES)}
         value = max(probs, key=probs.get)
         conf = probs[value]
@@ -36,8 +39,8 @@ class DecisionModel:
         # Policy rule: nothing above the tier cap is ever approved in the data.
         if F.over_cap(state):
             return False, 0.0, False
-        if F.security_risk(state):
-            return False, F.SECURITY_P, False
+        if F.policy_hold(state):
+            return False, F.POLICY_P, False
         p = float(self.approve_head.predict_proba(approve_X(self.vec, [state]))[0, 1])
         return p >= self.tau, p, max(p, 1 - p) < self.cuts["approve"]
 

@@ -1,18 +1,21 @@
-# Model card — Decide v0.2-gate2
+# Model card — Decide
 
 **Authors:** TAGISWILD, pavitraboga
 
 ## What we built
-A single CPU model serving three decisions behind `POST /v1/decide`:
+A single CPU model serving three decisions behind `POST /v1/decide`. Each request runs exactly one head.
 
-- **Shared backbone:** a single TF-IDF `FeatureUnion` (word 1–2 grams + char_wb 3–5 grams, 80k features) fitted over all text fields: ticket subject+body, draft replies and KB articles.
-- **route head:** a 5-way multinomial logistic regression on the backbone embedding of subject+body. It needs no extra calibration because it was already better calibrated than a Platt-wrapped version.
-- **approve head:** a hard policy gate plus a classifier. Any amount above the tier cap (free $31.25, pro $125, enterprise $500) is held with p=0. None of the over-cap tickets in train were approved. $0 requests mentioning 2FA, authenticator, recovery codes or account deletion are held for an identity check with p=0.02, their approval rate in train. Under-cap tickets go to a logistic regression on the backbone embedding plus amount/tier features. We approve when p ≥ 0.65. In theory the optimum for the 3:1 loss is 0.75, but sweeping out-of-fold cost on train put the minimum at 0.65.
-- **grounded head:** a logistic regression on the backbone embedding of the *draft words absent from the KB article*, which catches swapped entities. It also uses contradiction features: durations normalised to hours ("a week" vs "30 days", "half an hour" vs "60 minutes"), unmatched numbers, mismatched condition words (only/except/annual/monthly/domestic, and so on), and token overlap.
-- **Calibration:** the approve and grounded heads use sigmoid (Platt) calibration with 5-fold CV. The route head uses the multinomial softmax directly.
-- **Abstention:** each head has a confidence cut set from out-of-fold predictions so that about 84.5% of requests are answered, leaving margin above the 80% target.
+- **Shared backbone:** one TF-IDF `FeatureUnion` fitted over all ticket, draft and KB text. It combines word 1–2 grams, char 3–5 grams, and canonical-quantity tokens in which every duration and count is rewritten to a normal form, so "a week", "7 days" and "seven days" become the same token.
+- **Primary-intent extraction:** multi-request tickets flag the request that matters ("what I actually need help with is this:") and the asides ("for background,"). Labels follow the flagged request, so the route and approve heads read only that part.
+- **route head:** multinomial logistic regression on the primary-intent text, with temperature and uniform smoothing fitted on out-of-fold log-loss. The labels carry noise, so confident errors are expected.
+- **approve head:** deterministic policy holds come first, followed by a calibrated logistic regression.
+  - *Tier cap:* any amount above the cap (free $31.25, pro $125, enterprise $500) is held with p=0.
+  - *Policy holds:* requests to disable or reset 2FA, recover access through an authenticator or recovery codes, delete an account or data (including GDPR), or make partnership/reseller enquiries are held. So are tickets asking for a policy exception, disclosing a prior bank dispute, or being repeat or very new requests. None of these were approved in the data. They get p=0.003.
+  - *Classifier:* primary-intent text plus amount and tier features, including bands at 60% and 80% of the tier cap, where approval odds step down. The approve threshold is tuned on out-of-fold cost under the 3:1 loss.
+- **grounded head:** calibrated logistic regression on three views of the draft–KB difference after quantity normalisation: words only in the draft, words only in the KB article, and hashed cross-pairs of the two. The cross-pairs let the model learn which substitutions are harmless (synonyms) and which are contradictions (audience, method or quantity swaps). Quantity-mismatch counts are included as well.
+- **Abstention:** per-head confidence cuts are set from out-of-fold predictions so that about 84.5% of requests are answered.
 
-Each request runs exactly one head. No pretrained weights are used. Artifacts total 3.5 MB.
+No pretrained weights are used. Artifacts total about 5 MB.
 
 ## Training data
 `data/train.jsonl` (6,500 records). `data/dev.jsonl` (1,500) is used only for evaluation.
@@ -20,18 +23,18 @@ Each request runs exactly one head. No pretrained weights are used. Artifacts to
 ## Measured on dev (selfcheck.py, 4,500 calls)
 | | route | approve | grounded |
 |---|---|---|---|
-| quality | macro-F1 (answered) 0.920 | cost 0.217 vs always-hold 0.364 | macro-F1 0.917 |
-| full-coverage error | 0.156 | 0.113 | 0.113 |
-| ECE | 0.044 | 0.035 | 0.024 |
-| Brier skill | 0.709 | 0.634 | 0.633 |
-| coverage | 82.5% | 85.1% | 87.2% |
+| accuracy (full coverage) | 0.892 | 0.902 | 0.990 |
+| quality (answered) | macro-F1 0.946 | cost 0.202 | macro-F1 1.000 |
+| ECE | 0.029 | 0.019 | 0.011 |
+| Brier skill | 0.791 | 0.685 | 0.968 |
+| coverage | 84.8% | 83.3% | 85.3% |
 
-Total self-check score: **76.93 / 100**, with all gates passing and a mean p95 of 1.5 ms. Route macro-F1 is 0.840 at full coverage. The full report is in `results.json`.
+Total self-check score: **84.35 / 100**, with all gates passing and a mean p95 of about 2 ms. The full report is in `results.json`.
 
 ## Where it fails
-- **route:** confuses billing and account, and technical and account, when a ticket mixes topics. Labels are noisy. 
-- **approve:** it cannot see intent beyond surface words. The security rule only fires on exact phrases, so paraphrased requests fall through to the classifier.
-- **grounded:** duration parsing misses unusual phrasings. Contradictions that are not numeric or lexical, such as a changed eligibility condition worded with KB vocabulary, slip through.
+- **route:** about 8% of labels disagree on identical tickets, which caps accuracy. Vague tickets ("I have an issue, please get back to me") have no real signal.
+- **approve:** within the tier cap, outcomes are random within amount bands (about 85%, 60% and 30% approved below 60%, at 60–80%, and above 80% of the cap). The model reports those odds honestly, but it cannot resolve them.
+- **grounded:** quantity phrasings outside the normaliser's coverage, and new synonym pairs not seen in training.
 
 ## When it abstains
-It abstains when the top-class probability (route) or max(p, 1−p) (binary heads) falls below the per-head cut: route 0.67, approve 0.71, grounded 0.71. Over-cap and security holds never abstain because they are deterministic policy holds.
+It abstains when the top-class probability (route) or max(p, 1−p) (binary heads) falls below the per-head cut chosen for about 84.5% coverage. Policy holds never abstain.
