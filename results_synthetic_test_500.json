@@ -1,0 +1,88 @@
+{
+  "url": "http://localhost:8000/v1/decide",
+  "eval": "/Users/mrtag08/Documents/synthetic_test_4000.jsonl",
+  "n_records": 500,
+  "n_calls": 1500,
+  "gates": {
+    "schema_clean": true,
+    "latency_under_gate": true,
+    "reachable": true
+  },
+  "schema": {
+    "valid": 1500,
+    "total": 1500,
+    "violations": {},
+    "transport_errors": {}
+  },
+  "latency_ms": {
+    "p50": {
+      "route": 1.4642289999997615,
+      "approve": 1.828062500000005,
+      "grounded": 2.701729500000083
+    },
+    "p95": {
+      "route": 2.3510937500001994,
+      "approve": 3.1826705500000663,
+      "grounded": 4.308579200000083
+    },
+    "mean_p95": 3.280781166666783,
+    "overall_p50": 1.9639170000000927,
+    "overall_p95": 3.732458049999876,
+    "server_self_reported_p95": 2.9292,
+    "reconnects": 0
+  },
+  "quality": {
+    "route_macro_f1": 0.9393716007688614,
+    "route_acc": 0.902,
+    "coverage": {
+      "route": 0.724,
+      "approve": 0.856,
+      "grounded": 0.846
+    },
+    "approve_cost": 0.19626168224299065,
+    "approve_macro_f1": 0.9325635311859906,
+    "grounded_macro_f1": 1.0,
+    "fp_cost": 3.0,
+    "trivial": {
+      "route_macro_f1": 0.08993576017130621,
+      "approve_cost_always_hold": 0.3808411214953271,
+      "approve_cost_always_approve": 1.8574766355140186,
+      "grounded_macro_f1": 0.3797653958944282
+    }
+  },
+  "calibration": {
+    "route_ece": 0.04717717957775213,
+    "approve_ece": 0.021994706121134668,
+    "grounded_ece": 0.010396361737621918,
+    "approve_brier": 0.0765547495824067,
+    "grounded_brier": 0.008632709546369346,
+    "mean_ece": 0.026522749145502903,
+    "mean_brier": 0.04259372956438802,
+    "brier_skill": 0.8106442283338603,
+    "route_brier": 0.16948388207297513
+  },
+  "abstention": {
+    "risk_at_80": {
+      "route": 0.057499999999999996,
+      "approve": 0.06000000000000005,
+      "grounded": 0.0
+    },
+    "full_error": {
+      "route": 0.09799999999999998,
+      "approve": 0.10199999999999998,
+      "grounded": 0.010000000000000009
+    },
+    "declared_coverage": {
+      "route": 0.724,
+      "approve": 0.856,
+      "grounded": 0.846
+    }
+  },
+  "score_parts": {
+    "quality": 0.819401970831346,
+    "calibration": 0.8390152413031728,
+    "latency": 1.0,
+    "abstention": 0.6083433373349337
+  },
+  "score": 82.87660992585715
+}

@@ -28,6 +28,9 @@ from sklearn.pipeline import FeatureUnion
 import features as F
 
 COVERAGE = 0.845
+# Route confidence drops most when ticket wording shifts (extra greetings,
+# wrappers), so it gets a wider margin above the 80% coverage target.
+ROUTE_COVERAGE = 0.90
 APPROVE_TAU = 0.75  # 3:1 cost asymmetry -> approve only when p >= 3/4
 
 
@@ -95,9 +98,9 @@ def calibrated(C):
     return CalibratedClassifierCV(LogisticRegression(C=C, max_iter=3000), method="sigmoid", cv=5)
 
 
-def abstain_cut(conf):
-    """Confidence below which we abstain, so ~COVERAGE of cases are answered."""
-    return float(np.quantile(conf, 1.0 - COVERAGE))
+def abstain_cut(conf, coverage=COVERAGE):
+    """Confidence below which we abstain, so ~coverage of cases are answered."""
+    return float(np.quantile(conf, 1.0 - coverage))
 
 
 def ece(p, y, bins=15):
@@ -140,7 +143,7 @@ def main():
     route_T, route_eps = float(best[1]), float(best[2])
     print("route temperature %.2f eps %.2f" % (route_T, route_eps))
     oof = smooth(oof, route_T, route_eps)
-    route_cut = abstain_cut(oof.max(1))
+    route_cut = abstain_cut(oof.max(1), ROUTE_COVERAGE)
 
     # approve: train only on under-cap tickets; over-cap is a hard hold.
     under = np.array([not F.over_cap(s) for s in S])

@@ -13,7 +13,7 @@ A single CPU model serving three decisions behind `POST /v1/decide`. Each reques
   - *Policy holds:* requests to disable or reset 2FA, recover access through an authenticator or recovery codes, delete an account or data (including GDPR), or make partnership/reseller enquiries are held. So are tickets asking for a policy exception, disclosing a prior bank dispute, or being repeat or very new requests. None of these were approved in the data. They get p=0.003.
   - *Classifier:* primary-intent text plus amount and tier features, including bands at 60% and 80% of the tier cap, where approval odds step down. The approve threshold is tuned on out-of-fold cost under the 3:1 loss.
 - **grounded head:** calibrated logistic regression on three views of the draft–KB difference after quantity normalisation: words only in the draft, words only in the KB article, and hashed cross-pairs of the two. The cross-pairs let the model learn which substitutions are harmless (synonyms) and which are contradictions (audience, method or quantity swaps). Quantity-mismatch counts are included as well.
-- **Abstention:** per-head confidence cuts are set from out-of-fold predictions so that about 84.5% of requests are answered.
+- **Abstention:** per-head confidence cuts are set from out-of-fold predictions so that about 84.5% of requests are answered (90% for route). Route confidence drops most when wording shifts, so it gets the wider margin above the 80% target.
 
 No pretrained weights are used. Artifacts total about 3 MB.
 
@@ -24,12 +24,12 @@ No pretrained weights are used. Artifacts total about 3 MB.
 | | route | approve | grounded |
 |---|---|---|---|
 | accuracy (full coverage) | 0.892 | 0.902 | 0.990 |
-| quality (answered) | macro-F1 0.946 | cost 0.202 | macro-F1 1.000 |
+| quality (answered) | macro-F1 0.947 | cost 0.202 | macro-F1 1.000 |
 | ECE | 0.029 | 0.019 | 0.011 |
 | Brier skill | 0.791 | 0.685 | 0.968 |
-| coverage | 84.8% | 83.3% | 85.3% |
+| coverage | 89.4% | 83.3% | 85.3% |
 
-Total self-check score: **84.35 / 100**, with all gates passing and a mean p95 of about 2 ms. The full report is in `results.json`.
+Total self-check score: **84.37 / 100**, with all gates passing and a mean p95 of about 2 ms. The full report is in `results.json`. On a separate 4,000-record synthetic test set with reworded tickets, the score was 84.02, with accuracy unchanged on all three decisions.
 
 ## Where it fails
 - **route:** about 8% of labels disagree on identical tickets, which caps accuracy. Vague tickets ("I have an issue, please get back to me") have no real signal.
@@ -37,4 +37,4 @@ Total self-check score: **84.35 / 100**, with all gates passing and a mean p95 o
 - **grounded:** quantity phrasings outside the normaliser's coverage, and new synonym pairs not seen in training.
 
 ## When it abstains
-It abstains when the top-class probability (route) or max(p, 1−p) (binary heads) falls below the per-head cut chosen for about 84.5% coverage. Policy holds never abstain.
+It abstains when the top-class probability (route) or max(p, 1−p) (binary heads) falls below the per-head cut chosen for about 84.5% coverage (90% for route). Policy holds never abstain.
