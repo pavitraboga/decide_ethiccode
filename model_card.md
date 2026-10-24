@@ -20,7 +20,7 @@ No pretrained weights are used. Artifacts total about 3 MB.
 ## Training data
 `data/train.jsonl` (6,500 records). `data/dev.jsonl` (1,500) is used only for evaluation.
 
-## Measured on dev (selfcheck.py, 4,500 calls)
+## Measured on dev (1,500 records, selfcheck.py)
 | | route | approve | grounded |
 |---|---|---|---|
 | accuracy (full coverage) | 0.892 | 0.902 | 0.990 |
