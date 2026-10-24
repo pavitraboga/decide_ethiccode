@@ -29,7 +29,7 @@ No pretrained weights are used. Artifacts total about 3 MB.
 | Brier skill | 0.791 | 0.685 | 0.968 |
 | coverage | 89.4% | 83.3% | 85.3% |
 
-Total self-check score: **84.37 / 100**, with all gates passing and a mean p95 of about 2 ms. The full report is in `results.json`. On a separate 4,000-record synthetic test set with reworded tickets, the score was 84.02, with accuracy unchanged on all three decisions.
+Total self-check score: **84.37 / 100**, with all gates passing and a mean p95 of about 2 ms. The full report is in `results.json`.
 
 ## Where it fails
 - **route:** about 8% of labels disagree on identical tickets, which caps accuracy. Vague tickets ("I have an issue, please get back to me") have no real signal.
