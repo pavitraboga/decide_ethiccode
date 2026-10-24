@@ -13,7 +13,7 @@ A single CPU model serving three decisions behind `POST /v1/decide`. Each reques
   - *Policy holds:* requests to disable or reset 2FA, recover access through an authenticator or recovery codes, delete an account or data (including GDPR), or make partnership/reseller enquiries are held. So are tickets asking for a policy exception, disclosing a prior bank dispute, or being repeat or very new requests. None of these were approved in the data. They get p=0.003.
   - *Classifier:* primary-intent text plus amount and tier features, including bands at 60% and 80% of the tier cap, where approval odds step down. The approve threshold is tuned on out-of-fold cost under the 3:1 loss.
 - **grounded head:** calibrated logistic regression on three views of the draft–KB difference after quantity normalisation: words only in the draft, words only in the KB article, and hashed cross-pairs of the two. The cross-pairs let the model learn which substitutions are harmless (synonyms) and which are contradictions (audience, method or quantity swaps). Quantity-mismatch counts are included as well.
-- **Abstention:** per-head confidence cuts are set from out-of-fold predictions so that about 84.5% of requests are answered (90% for route). Route confidence drops most when wording shifts, so it gets the wider margin above the 80% target.
+- **Abstention:** per-head confidence cuts are set from out-of-fold predictions so that about 84.5% of requests are answered (90% for route). Route gets the wider margin above the 80% target because five-way confidence varies most between data sets.
 
 No pretrained weights are used. Artifacts total about 3 MB.
 

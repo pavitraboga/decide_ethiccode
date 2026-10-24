@@ -28,8 +28,8 @@ from sklearn.pipeline import FeatureUnion
 import features as F
 
 COVERAGE = 0.845
-# Route confidence drops most when ticket wording shifts (extra greetings,
-# wrappers), so it gets a wider margin above the 80% coverage target.
+# Five-way routing confidence varies most between data sets, so route gets a
+# wider margin above the 80% coverage target.
 ROUTE_COVERAGE = 0.90
 APPROVE_TAU = 0.75  # 3:1 cost asymmetry -> approve only when p >= 3/4
 
